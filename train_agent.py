@@ -1,71 +1,67 @@
 import numpy as np
 import pickle
 import random
-from simple_custom_taxi_env import SimpleTaxiEnv  # Assume this is saved as simple_customtaxi_env.py
+from wall_1000_env import SimpleTaxiEnv
 from tqdm import tqdm
-import time 
 # Q-learning parameters
 alpha = 0.1  # Learning rate
 gamma = 0.99  # Discount factor
 epsilon = 0.1  # Exploration rate
-episodes = 3000  # Number of training episodes
+episodes = 4000  # Number of training episodes
 
 # Initialize Q-table
 q_table = {}
 
-# Training function
-def train_agent():
+def get_state_key(obs):
+    """Convert observation to a state tuple for Q-table."""
+    taxi_row, taxi_col, r1, c1, r2, c2, r3, c3, r4, c4, \
+    obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
+    passenger_look, destination_look = obs
+    return (
+        r1 - taxi_row, c1 - taxi_col,  # Relative to R
+        r2 - taxi_row, c2 - taxi_col,  # Relative to G
+        r3 - taxi_row, c3 - taxi_col,  # Relative to Y
+        r4 - taxi_row, c4 - taxi_col,  # Relative to B
+        obstacle_north, obstacle_south, obstacle_east, obstacle_west,
+        passenger_look, destination_look
+    )
 
+def train_agent():
+    global q_table
     for episode in tqdm(range(episodes)):
         # Random grid size between 5 and 10 for generalization
         grid_size = random.randint(5, 10)
         env = SimpleTaxiEnv(grid_size=grid_size, fuel_limit=5000)
         obs, _ = env.reset()
+        state = get_state_key(obs)
         done = False
-        while not done:
-            # State representation
-            taxi_row, taxi_col, r1, c1, r2, c2, r3, c3, r4, c4, \
-            obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
-            passenger_look, destination_look = obs
-            state = (
-                r1 - taxi_row, c1 - taxi_col,
-                r2 - taxi_row, c2 - taxi_col,
-                r3 - taxi_row, c3 - taxi_col,
-                r4 - taxi_row, c4 - taxi_col,
-                obstacle_north, obstacle_south, obstacle_east, obstacle_west,
-                passenger_look, destination_look
-            )
-            state_tuple = tuple(state)
 
+        while not done:
             # Initialize Q-values for new states
-            if state_tuple not in q_table:
-                q_table[state_tuple] = np.zeros(6)  # 6 actions
+            if state not in q_table:
+                q_table[state] = np.zeros(6)  # 6 actions
 
             # Epsilon-greedy action selection
             if random.random() < epsilon:
                 action = random.randint(0, 5)
             else:
-                action = np.argmax(q_table[state_tuple])
+                action = np.argmax(q_table[state])
 
-            # Take action
+            # Take step and get next observation
             next_obs, reward, done, _ = env.step(action)
+            next_state = get_state_key(next_obs)
 
-            # Update Q-table
-            next_state = tuple(
-                (next_obs[2] - next_obs[0], next_obs[3] - next_obs[1],  # R
-                 next_obs[4] - next_obs[0], next_obs[5] - next_obs[1],  # G
-                 next_obs[6] - next_obs[0], next_obs[7] - next_obs[1],  # Y
-                 next_obs[8] - next_obs[0], next_obs[9] - next_obs[1],  # B
-                 next_obs[10], next_obs[11], next_obs[12], next_obs[13],  # Obstacles
-                 next_obs[14], next_obs[15])  # Passenger, Destination
-            )
+            # Initialize Q-values for next state if unseen
             if next_state not in q_table:
                 q_table[next_state] = np.zeros(6)
 
-            # Q-learning update
-            q_table[state_tuple][action] += alpha * (
-                reward + gamma * np.max(q_table[next_state]) - q_table[state_tuple][action]
+            # Update Q-table after one step
+            q_table[state][action] += alpha * (
+                reward + gamma * np.max(q_table[next_state]) - q_table[state][action]
             )
+
+            # Move to next state
+            state = next_state
             obs = next_obs
 
         if (episode + 1) % 1000 == 0:
