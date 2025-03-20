@@ -7,7 +7,7 @@ from tqdm import tqdm
 alpha = 0.1  # Learning rate
 gamma = 0.99  # Discount factor
 epsilon = 0.1  # Exploration rate
-episodes = 4000  # Number of training episodes
+episodes = 2000  # Number of training episodes
 
 # Initialize Q-table
 q_table = {}
