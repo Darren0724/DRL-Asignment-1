@@ -27,12 +27,7 @@ def get_action(obs):
 
     # Create state representation: relative distances to stations + environmental info
     state = (
-        r1 - taxi_row, c1 - taxi_col,  # Relative to R
-        r2 - taxi_row, c2 - taxi_col,  # Relative to G
-        r3 - taxi_row, c3 - taxi_col,  # Relative to Y
-        r4 - taxi_row, c4 - taxi_col,  # Relative to B
         obstacle_north, obstacle_south, obstacle_east, obstacle_west,
-        passenger_look, destination_look
     )
 
     # Convert state to tuple for hashing
