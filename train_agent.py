@@ -1,13 +1,13 @@
 import numpy as np
 import pickle
 import random
-from wall_1000_env import SimpleTaxiEnv
+from wall_1000_pick_1000 import SimpleTaxiEnv
 from tqdm import tqdm
 # Q-learning parameters
 alpha = 0.1  # Learning rate
 gamma = 0.99  # Discount factor
 epsilon = 0.1  # Exploration rate
-episodes = 2000  # Number of training episodes
+episodes = 1000  # Number of training episodes
 
 # Initialize Q-table
 try:
@@ -50,7 +50,7 @@ def train_agent():
             obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
             passenger_look, destination_look = obs
             state = (
-                obstacle_north, obstacle_south, obstacle_east, obstacle_west,
+                obstacle_north, obstacle_south, obstacle_east, obstacle_west, passenger_look, destination_look
             )
             if state not in q_table:
                 q_table[state] = np.zeros(6)  # 6 actions
