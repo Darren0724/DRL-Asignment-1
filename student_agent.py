@@ -6,6 +6,7 @@ import random
 try:
     with open("q_table.pkl", "rb") as f:
         q_table = pickle.load(f)
+        print(q_table) # print the q_table
 except FileNotFoundError:
     # If Q-table is missing, initialize an empty one (though training is recommended)
     q_table = {}

@@ -10,7 +10,13 @@ epsilon = 0.1  # Exploration rate
 episodes = 2000  # Number of training episodes
 
 # Initialize Q-table
-q_table = {}
+try:
+    with open("q_table.pkl", "rb") as f:
+        q_table = pickle.load(f)
+        print(q_table) # print the q_table
+except FileNotFoundError:
+    # If Q-table is missing, initialize an empty one (though training is recommended)
+    q_table = {}
 
 def get_state_key(obs):
     """Convert observation to a state tuple for Q-table."""
@@ -33,11 +39,19 @@ def train_agent():
         grid_size = random.randint(5, 10)
         env = SimpleTaxiEnv(grid_size=grid_size, fuel_limit=5000)
         obs, _ = env.reset()
-        state = get_state_key(obs)
+        
+
+        
         done = False
 
         while not done:
             # Initialize Q-values for new states
+            taxi_row, taxi_col, r1, c1, r2, c2, r3, c3, r4, c4, \
+            obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
+            passenger_look, destination_look = obs
+            state = (
+                obstacle_north, obstacle_south, obstacle_east, obstacle_west,
+            )
             if state not in q_table:
                 q_table[state] = np.zeros(6)  # 6 actions
 
