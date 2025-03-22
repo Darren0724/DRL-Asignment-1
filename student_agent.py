@@ -12,10 +12,10 @@ def get_state_key(obs):
     obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
     passenger_look, destination_look = obs
     return (
-        r_rel_row, r_rel_col,  # Relative to R
-        g_rel_row, g_rel_col,  # Relative to G
-        y_rel_row, y_rel_col,  # Relative to Y
-        b_rel_row, b_rel_col,  # Relative to B
+        r_rel_row, r_rel_col,
+        g_rel_row, g_rel_col,
+        y_rel_row, y_rel_col,
+        b_rel_row, b_rel_col,
         obstacle_north, obstacle_south, obstacle_east, obstacle_west,
         passenger_look, destination_look
     )
