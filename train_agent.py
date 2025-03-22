@@ -1,33 +1,34 @@
 import numpy as np
 import pickle
 import random
-from wall_1000_pick_1000 import SimpleTaxiEnv
+import env1 as env2
 from tqdm import tqdm
+
 # Q-learning parameters
 alpha = 0.1  # Learning rate
 gamma = 0.99  # Discount factor
 epsilon = 0.1  # Exploration rate
-episodes = 1000  # Number of training episodes
+episodes = 3000  # Number of training episodes
 
 # Initialize Q-table
 try:
     with open("q_table.pkl", "rb") as f:
         q_table = pickle.load(f)
-        print(q_table) # print the q_table
+        print("Q-table loaded:", q_table)
 except FileNotFoundError:
-    # If Q-table is missing, initialize an empty one (though training is recommended)
     q_table = {}
 
 def get_state_key(obs):
     """Convert observation to a state tuple for Q-table."""
-    taxi_row, taxi_col, r1, c1, r2, c2, r3, c3, r4, c4, \
+    taxi_row, taxi_col, \
+    r_rel_row, r_rel_col, g_rel_row, g_rel_col, y_rel_row, y_rel_col, b_rel_row, b_rel_col, \
     obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
     passenger_look, destination_look = obs
     return (
-        r1 - taxi_row, c1 - taxi_col,  # Relative to R
-        r2 - taxi_row, c2 - taxi_col,  # Relative to G
-        r3 - taxi_row, c3 - taxi_col,  # Relative to Y
-        r4 - taxi_row, c4 - taxi_col,  # Relative to B
+        r_rel_row, r_rel_col,  # Relative to R
+        g_rel_row, g_rel_col,  # Relative to G
+        y_rel_row, y_rel_col,  # Relative to Y
+        b_rel_row, b_rel_col,  # Relative to B
         obstacle_north, obstacle_south, obstacle_east, obstacle_west,
         passenger_look, destination_look
     )
@@ -35,33 +36,23 @@ def get_state_key(obs):
 def train_agent():
     global q_table
     for episode in tqdm(range(episodes)):
-        # Random grid size between 5 and 10 for generalization
-        grid_size = random.randint(5, 10)
-        env = SimpleTaxiEnv(grid_size=grid_size, fuel_limit=5000)
+        grid_size = random.randint(5, 10)  # Random grid size for generalization
+        env = env2.SimpleTaxiEnv(grid_size=grid_size, fuel_limit=5000)
         obs, _ = env.reset()
+        state = get_state_key(obs)
         
-
+        if state not in q_table:
+            q_table[state] = np.zeros(6)  # 6 actions
         
         done = False
-
         while not done:
-            # Initialize Q-values for new states
-            taxi_row, taxi_col, r1, c1, r2, c2, r3, c3, r4, c4, \
-            obstacle_north, obstacle_south, obstacle_east, obstacle_west, \
-            passenger_look, destination_look = obs
-            state = (
-                obstacle_north, obstacle_south, obstacle_east, obstacle_west, passenger_look, destination_look
-            )
-            if state not in q_table:
-                q_table[state] = np.zeros(6)  # 6 actions
-
             # Epsilon-greedy action selection
             if random.random() < epsilon:
                 action = random.randint(0, 5)
             else:
                 action = np.argmax(q_table[state])
 
-            # Take step and get next observation
+            # Take step
             next_obs, reward, done, _ = env.step(action)
             next_state = get_state_key(next_obs)
 
@@ -69,7 +60,7 @@ def train_agent():
             if next_state not in q_table:
                 q_table[next_state] = np.zeros(6)
 
-            # Update Q-table after one step
+            # Update Q-table
             q_table[state][action] += alpha * (
                 reward + gamma * np.max(q_table[next_state]) - q_table[state][action]
             )
@@ -78,7 +69,7 @@ def train_agent():
             state = next_state
             obs = next_obs
 
-        if (episode + 1) % 1000 == 0:
+        if (episode + 1) % 100 == 0:
             print(f"Episode {episode + 1}/{episodes} completed")
 
     # Save Q-table
