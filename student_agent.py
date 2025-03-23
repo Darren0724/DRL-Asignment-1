@@ -19,6 +19,9 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
+epsilon = 0.1  # Exploration rate for epsilon-greedy
+alpha = 0.1    # Learning rate for Q-table update
+gamma = 0.99   # Discount factor for Q-table update
 
 def sign(x):   
     if x > 0:
@@ -54,7 +57,7 @@ def get_state_key(obs):
     
     return (north_state, south_state, east_state, west_state, sign(goal_r - now_r), sign(goal_c - now_c))
 
-def get_action(obs):
+def get_action(obs, reward=None, next_obs=None):
     global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history
     
     # Update station positions and current position
@@ -110,15 +113,28 @@ def get_action(obs):
     # Get current state
     state = get_state_key(obs)
     
-    # Greedy action selection (no exploration in testing)
+    # ε-greedy action selection
     if state not in q_table:
-        q_table[state] = np.zeros(6)  # Initialize if not in table (unlikely after training)
+        q_table[state] = np.zeros(6)  # Initialize if not in table
     q_values = q_table[state]
-    last_action = max(valid_actions, key=lambda a: q_values[a])  # Choose best action
+    
+    if random.random() < epsilon:
+        last_action = random.choice(valid_actions)  # Explore
+    else:
+        last_action = max(valid_actions, key=lambda a: q_values[a])  # Exploit
     
     # Update move history for movement actions
     if last_action in [0, 1, 2, 3] and not (last_action == 0 and obs[11] or last_action == 1 and obs[10] or last_action == 2 and obs[12] or last_action == 3 and obs[13]):
         move_history[(now_r, now_c, last_action)] = True
+    
+    # Update Q-table if reward and next_obs are provided
+    if reward is not None and next_obs is not None:
+        next_state = get_state_key(next_obs)
+        if next_state not in q_table:
+            q_table[next_state] = np.zeros(6)
+        q_table[state][last_action] += alpha * (
+            reward + gamma * np.max(q_table[next_state]) - q_table[state][last_action]
+        )
     
     return last_action
 
