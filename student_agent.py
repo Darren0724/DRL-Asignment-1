@@ -19,7 +19,7 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-epsilon = 0.01  # Exploration rate for epsilon-greedy
+epsilon = 0.34  # Exploration rate for epsilon-greedy
 alpha = 0.1    # Learning rate for Q-table update
 gamma = 0.99   # Discount factor for Q-table update
 
