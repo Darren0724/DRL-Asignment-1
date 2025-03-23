@@ -2,10 +2,11 @@ import numpy as np
 import pickle
 import random 
 from time import sleep
+
 with open("q_table.pkl", "rb") as f:
     q_table = pickle.load(f)
 
-now_doing = 0 # 0: moving1, 1: moving2, 2: moving3, 3: moving4, 4: move pickup, 5: pickup, 6: move dropoff 7: dropoff
+now_doing = 0  # 0: moving1, 1: moving2, 2: moving3, 3: moving4, 4: move pickup, 5: pickup, 6: move dropoff, 7: dropoff
 goal_r = -1
 goal_c = -1
 now_r = 0
@@ -15,6 +16,8 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
+tau = 0.1  # Fixed temperature for testing
+
 def sign(x):   
     if x > 0:
         return 1
@@ -22,6 +25,7 @@ def sign(x):
         return -1
     else:
         return 0
+
 def sign2(x):   
     if x > 3:
         return 2
@@ -33,28 +37,31 @@ def sign2(x):
         return -1
     else:
         return 0
+
 def get_state_key(obs):
-    # Extract only the surrounding wall info from the full observation
     obstacle_north = obs[10]
     obstacle_south = obs[11]
     obstacle_east = obs[12]
     obstacle_west = obs[13]
     return (now_doing, obstacle_north, obstacle_south, obstacle_east, obstacle_west, sign2(goal_r - now_r), sign2(goal_c - now_c))
 
+def softmax(q_values, tau):
+    """Compute Softmax probabilities for Q-values with temperature tau."""
+    # Subtract max to prevent overflow
+    q_values = q_values - np.max(q_values[np.isfinite(q_values)])  # Only consider finite values
+    exp_q = np.exp(q_values / tau)
+    sum_exp_q = np.sum(exp_q)
+    if sum_exp_q == 0 or not np.isfinite(sum_exp_q):  # Handle all -inf or overflow
+        # If all actions are -inf, assign uniform probability to valid actions
+        probabilities = np.ones_like(q_values) / np.sum(np.ones_like(q_values))
+    else:
+        probabilities = exp_q / sum_exp_q
+    return probabilities
 
 def get_action(obs):
+    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table
     state = get_state_key(obs)
-    global now_doing,goal_r,goal_c ,now_r ,now_c ,row ,col ,st ,ed ,last_action,q_table
-    #print(now_doing,st,ed)
-    #print(goal_c,goal_r,now_c,now_r)
-    #print(state)
-    #if state not in q_table:
-    #    print('not in table')
-    #else:
-    #    print(q_table[state])
-    #print(obs)
-    #print(last_action)
-    #sleep(0.5)
+    
     for i in range(4):
         row[i] = obs[2*i+2]
         col[i] = obs[2*i+3]
@@ -63,6 +70,7 @@ def get_action(obs):
         goal_c = col[0]
     now_r = obs[0]
     now_c = obs[1]
+    
     if now_doing < 4:
         if now_r == goal_r and now_c == goal_c:
             if obs[14] == 1:
@@ -77,7 +85,7 @@ def get_action(obs):
                 now_doing += 1
                 goal_r = row[now_doing]
                 goal_c = col[now_doing]
-    elif now_doing == 4 :
+    elif now_doing == 4:
         if now_r == goal_r and now_c == goal_c:
             now_doing = 5
     elif now_doing == 5:
@@ -91,15 +99,24 @@ def get_action(obs):
     elif now_doing == 7:
         if now_r == goal_r and now_c == goal_c and last_action == 5:
             now_doing = 8
+    
+    # Define valid actions based on now_doing
+    valid_actions = [i for i in range(4)]  # Movement actions
+    if now_doing == 5:
+        valid_actions.append(4)  # Add PICKUP
+    elif now_doing == 7:
+        valid_actions.append(5)  # Add DROPOFF
+    
+    # Softmax action selection
     if state not in q_table:
-        valid_actions = [i for i in range(4)] 
-        if now_doing == 5:
-            valid_actions.append(4)
-        elif now_doing == 7:
-            valid_actions.append(5) 
-        last_action = random.choice(valid_actions) if valid_actions else random.randint(0, 5)
-        return last_action
-    last_action = np.argmax(q_table[state])
+        q_table[state] = np.zeros(6)  # Initialize if not in table
+    q_values = q_table[state]
+    action_mask = np.full(6, -np.inf)  # Mask invalid actions
+    for a in valid_actions:
+        action_mask[a] = q_values[a]
+    probabilities = softmax(action_mask, tau)
+    last_action = np.random.choice(6, p=probabilities)
     return last_action
+
 if __name__ == "__main__":
     print(q_table)
