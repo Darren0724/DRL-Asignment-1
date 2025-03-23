@@ -20,7 +20,7 @@ st = -1
 ed = -1
 last_action = 0
 epsilon = 0.1  # Exploration rate for epsilon-greedy
-alpha = 0.1    # Learning rate for Q-table update
+alpha = 0.01    # Learning rate for Q-table update
 gamma = 0.99   # Discount factor for Q-table update
 rec_reward = 0
 rec_state = None
@@ -64,11 +64,13 @@ def get_action(obs, reward=None, next_obs=None):
     global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history, rec_reward, rec_state, step, epsilon
     step += 1
     if step > 50:
-        epsilon = 0.2
+        epsilon = 0.1
     if step > 100:
-        epsilon = 0.3
+        epsilon = 0.2
     if step > 200:
-        epsilon = 0.5
+        epsilon = 0.3
+    if step > 300:
+        epsilon = 0.4
     if rec_reward is not None and rec_state is not None:
         next_state = get_state_key(obs)
         if next_state not in q_table:
