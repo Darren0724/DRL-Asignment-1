@@ -1,11 +1,14 @@
 import numpy as np
 import pickle
-import random 
+import random
 from time import sleep
 
+# Load the trained Q-table
 with open("q_table.pkl", "rb") as f:
     q_table = pickle.load(f)
 
+# Global variables (consistent with train_agent.py)
+move_history = {}
 now_doing = 0  # 0: moving1, 1: moving2, 2: moving3, 3: moving4, 4: move pickup, 5: pickup, 6: move dropoff, 7: dropoff
 goal_r = -1
 goal_c = -1
@@ -16,7 +19,6 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-tau = 0.1  # Fixed temperature for testing
 
 def sign(x):   
     if x > 0:
@@ -39,38 +41,36 @@ def sign2(x):
         return 0
 
 def get_state_key(obs):
+    global move_history, now_r, now_c
     obstacle_north = obs[10]
     obstacle_south = obs[11]
     obstacle_east = obs[12]
     obstacle_west = obs[13]
-    return (now_doing, obstacle_north, obstacle_south, obstacle_east, obstacle_west, sign2(goal_r - now_r), sign2(goal_c - now_c))
-
-def softmax(q_values, tau):
-    """Compute Softmax probabilities for Q-values with temperature tau."""
-    # Subtract max to prevent overflow
-    q_values = q_values - np.max(q_values[np.isfinite(q_values)])  # Only consider finite values
-    exp_q = np.exp(q_values / tau)
-    sum_exp_q = np.sum(exp_q)
-    if sum_exp_q == 0 or not np.isfinite(sum_exp_q):  # Handle all -inf or overflow
-        # If all actions are -inf, assign uniform probability to valid actions
-        probabilities = np.ones_like(q_values) / np.sum(np.ones_like(q_values))
-    else:
-        probabilities = exp_q / sum_exp_q
-    return probabilities
+    
+    north_state = 1 if obstacle_north else (2 if (now_r, now_c, 1) in move_history else 0)
+    south_state = 1 if obstacle_south else (2 if (now_r, now_c, 0) in move_history else 0)
+    east_state = 1 if obstacle_east else (2 if (now_r, now_c, 2) in move_history else 0)
+    west_state = 1 if obstacle_west else (2 if (now_r, now_c, 3) in move_history else 0)
+    
+    return (north_state, south_state, east_state, west_state, sign(goal_r - now_r), sign(goal_c - now_c))
 
 def get_action(obs):
-    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table
-    state = get_state_key(obs)
+    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history
     
+    # Update station positions and current position
     for i in range(4):
         row[i] = obs[2*i+2]
         col[i] = obs[2*i+3]
-    if goal_r == -1:
-        goal_r = row[0]
-        goal_c = col[0]
     now_r = obs[0]
     now_c = obs[1]
     
+    # Initialize goal if not set (start of episode)
+    if goal_r == -1:
+        goal_r = row[0]
+        goal_c = col[0]
+        move_history.clear()  # Reset history at the start of an episode
+    
+    # State machine transitions (consistent with train_agent.py)
     if now_doing < 4:
         if now_r == goal_r and now_c == goal_c:
             if obs[14] == 1:
@@ -101,22 +101,26 @@ def get_action(obs):
             now_doing = 8
     
     # Define valid actions based on now_doing
-    valid_actions = [i for i in range(4)]  # Movement actions
-    if now_doing == 5:
-        valid_actions.append(4)  # Add PICKUP
-    elif now_doing == 7:
-        valid_actions.append(5)  # Add DROPOFF
+    valid_actions = [i for i in range(4)]  # Movement actions by default
+    if now_doing == 5 and now_r == goal_r and now_c == goal_c:
+        valid_actions = [4]  # Only PICKUP when at pickup location
+    elif now_doing == 7 and now_r == goal_r and now_c == goal_c:
+        valid_actions = [5]  # Only DROPOFF when at dropoff location
     
-    # Softmax action selection
+    # Get current state
+    state = get_state_key(obs)
+    
+    # Greedy action selection (no exploration in testing)
     if state not in q_table:
-        q_table[state] = np.zeros(6)  # Initialize if not in table
+        q_table[state] = np.zeros(6)  # Initialize if not in table (unlikely after training)
     q_values = q_table[state]
-    action_mask = np.full(6, -np.inf)  # Mask invalid actions
-    for a in valid_actions:
-        action_mask[a] = q_values[a]
-    probabilities = softmax(action_mask, tau)
-    last_action = np.random.choice(6, p=probabilities)
+    last_action = max(valid_actions, key=lambda a: q_values[a])  # Choose best action
+    
+    # Update move history for movement actions
+    if last_action in [0, 1, 2, 3] and not (last_action == 0 and obs[11] or last_action == 1 and obs[10] or last_action == 2 and obs[12] or last_action == 3 and obs[13]):
+        move_history[(now_r, now_c, last_action)] = True
+    
     return last_action
 
 if __name__ == "__main__":
-    print(q_table)
+    print("Q-table loaded with size:", len(q_table))
