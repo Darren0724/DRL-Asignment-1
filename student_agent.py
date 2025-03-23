@@ -58,7 +58,7 @@ def get_state_key(obs):
     return (north_state, south_state, east_state, west_state, sign(goal_r - now_r), sign(goal_c - now_c))
 
 def get_action(obs, reward=None, next_obs=None):
-    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history,step 
+    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history,step ,epsilon
     
     # Update station positions and current position
     for i in range(4):
