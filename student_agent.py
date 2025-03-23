@@ -19,10 +19,10 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-epsilon = 0.01  # Exploration rate for epsilon-greedy
+epsilon = 0.15  # Exploration rate for epsilon-greedy
 alpha = 0.1    # Learning rate for Q-table update
 gamma = 0.99   # Discount factor for Q-table update
-step = 0
+
 def sign(x):   
     if x > 0:
         return 1
@@ -66,17 +66,7 @@ def get_action(obs, reward=None, next_obs=None):
         col[i] = obs[2*i+3]
     now_r = obs[0]
     now_c = obs[1]
-    step += 1
-    if step > 200:
-        epsilon = 0.05
-    if step > 400:
-        epsilon = 0.1
-    if step > 1000:
-        epsilon = 0.2
-    if step > 2000:
-        epsilon = 0.3
-    if step > 3000:
-        epsilon = 0.45
+    
     # Initialize goal if not set (start of episode)
     if goal_r == -1:
         goal_r = row[0]
