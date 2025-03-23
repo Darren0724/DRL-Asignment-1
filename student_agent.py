@@ -19,9 +19,11 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-epsilon = 0.01  # Exploration rate for epsilon-greedy
+epsilon = 0.1  # Exploration rate for epsilon-greedy
 alpha = 0.1    # Learning rate for Q-table update
 gamma = 0.99   # Discount factor for Q-table update
+rec_reward = 0
+rec_state = None
 step = 0
 def sign(x):   
     if x > 0:
@@ -58,25 +60,27 @@ def get_state_key(obs):
     return (north_state, south_state, east_state, west_state, sign(goal_r - now_r), sign(goal_c - now_c))
 
 def get_action(obs, reward=None, next_obs=None):
-    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history,step ,epsilon
     
+    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history, rec_reward, rec_state, step, epsilon
+    step += 1
+    if step > 100:
+        epsilon = 0.3
+    if step > 200:
+        epsilon = 0.5
+    if rec_reward is not None and rec_state is not None:
+        next_state = get_state_key(obs)
+        if next_state not in q_table:
+            q_table[next_state] = np.zeros(6)
+        q_table[rec_state][last_action] += alpha * (
+            rec_reward + gamma * np.max(q_table[next_state]) - q_table[rec_state][last_action]
+        )
     # Update station positions and current position
     for i in range(4):
         row[i] = obs[2*i+2]
         col[i] = obs[2*i+3]
     now_r = obs[0]
     now_c = obs[1]
-    step += 1
-    if step > 200:
-        epsilon = 0.05
-    if step > 400:
-        epsilon = 0.1
-    if step > 1000:
-        epsilon = 0.2
-    if step > 2000:
-        epsilon = 0.3
-    if step > 3000:
-        epsilon = 0.45
+    
     # Initialize goal if not set (start of episode)
     if goal_r == -1:
         goal_r = row[0]
@@ -136,15 +140,34 @@ def get_action(obs, reward=None, next_obs=None):
     # Update move history for movement actions
     if last_action in [0, 1, 2, 3] and not (last_action == 0 and obs[11] or last_action == 1 and obs[10] or last_action == 2 and obs[12] or last_action == 3 and obs[13]):
         move_history[(now_r, now_c, last_action)] = True
-    
+    shaped_reward = 0
+    if last_action == 0:  # South
+        if obs[11] == 1:
+            shaped_reward = -100
+    if last_action == 1:  # South
+        if obs[10] == 1:
+            shaped_reward = -100
+    if last_action == 2:  # South
+        if obs[12] == 1:
+            shaped_reward = -100
+    if last_action == 3:  # South
+        if obs[13] == 1:
+            shaped_reward = -100
+    elif last_action == 4:  # PICKUP
+        if now_doing == 5 and now_r == goal_r and now_c == goal_c:
+            shaped_reward = 100
+        else:
+            shaped_reward = -100
+    elif last_action == 5:  # DROPOFF
+        if now_doing == 7 and now_r == goal_r and now_c == goal_c:
+            shaped_reward = 100
+        else:
+            shaped_reward = -100
+
     # Update Q-table if reward and next_obs are provided
-    if reward is not None and next_obs is not None:
-        next_state = get_state_key(next_obs)
-        if next_state not in q_table:
-            q_table[next_state] = np.zeros(6)
-        q_table[state][last_action] += alpha * (
-            reward + gamma * np.max(q_table[next_state]) - q_table[state][last_action]
-        )
+    reward = shaped_reward
+    rec_reward = reward 
+    rec_state = state
     
     return last_action
 
