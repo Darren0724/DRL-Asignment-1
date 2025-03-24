@@ -164,7 +164,7 @@ def get_action(obs, reward=None, next_obs=None):
         if now_doing == 7 and now_r == goal_r and now_c == goal_c:
             shaped_reward = 100
         else:
-            shaped_reward = -100
+            shaped_reward = -100 
 
     # Update Q-table if reward and next_obs are provided
     reward = shaped_reward
