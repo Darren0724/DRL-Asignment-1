@@ -66,7 +66,9 @@ def get_action(obs, reward=None, next_obs=None):
     if step > 200:
         epsilon = 0.15
     if step > 400:
-        epsilon = 0.22
+        epsilon = 0.2
+    if step > 800:
+        epsilon = 0.01
     if rec_reward is not None and rec_state is not None:
         next_state = get_state_key(obs)
         #print('yes')
