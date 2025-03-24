@@ -19,9 +19,9 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-epsilon = 0.02  # Exploration rate for epsilon-greedy
+epsilon = 0.01  # Exploration rate for epsilon-greedy
 alpha = 0.1    # Learning rate for Q-table update
-gamma = 0.99   # Discount factor for Q-table update
+gamma = 0.5   # Discount factor for Q-table update
 rec_reward = 0
 rec_state = None
 step = 0
@@ -63,17 +63,6 @@ def get_action(obs, reward=None, next_obs=None):
     
     global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history, rec_reward, rec_state, step, epsilon
     step += 1
-    if step > 100:
-        epsilon = 0.05
-    if step > 200:
-        epsilon = 0.15
-    if step > 400:
-        epsilon = 0.2
-    if step > 600:
-        epsilon = 0.3
-    if step > 900:
-        epsilon = 0.4
-    
     if rec_reward is not None and rec_state is not None:
         next_state = get_state_key(obs)
         #print('yes')
@@ -151,26 +140,26 @@ def get_action(obs, reward=None, next_obs=None):
     shaped_reward = -0.1
     if last_action == 0:  # South
         if obs[11] == 1:
-            shaped_reward = -1000
+            shaped_reward = -10
     if last_action == 1:  # South
         if obs[10] == 1:
-            shaped_reward = -1000
+            shaped_reward = -10
     if last_action == 2:  # South
         if obs[12] == 1:
-            shaped_reward = -1000
+            shaped_reward = -10
     if last_action == 3:  # South
         if obs[13] == 1:
-            shaped_reward = -1000
+            shaped_reward = -10
     elif last_action == 4:  # PICKUP
         if now_doing == 5 and now_r == goal_r and now_c == goal_c:
             shaped_reward += 0
         else:
-            shaped_reward = -1000
+            shaped_reward = -10
     elif last_action == 5:  # DROPOFF
         if now_doing == 7 and now_r == goal_r and now_c == goal_c:
             shaped_reward += 0
         else:
-            shaped_reward = -1000
+            shaped_reward = -10
 
     # Update Q-table if reward and next_obs are provided
     reward = shaped_reward
