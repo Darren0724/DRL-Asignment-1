@@ -144,26 +144,26 @@ def get_action(obs, reward=None, next_obs=None):
     shaped_reward = -0.1
     if last_action == 0:  # South
         if obs[11] == 1:
-            shaped_reward = -10
+            shaped_reward = -1000
     if last_action == 1:  # South
         if obs[10] == 1:
-            shaped_reward = -10
+            shaped_reward = -1000
     if last_action == 2:  # South
         if obs[12] == 1:
-            shaped_reward = -10
+            shaped_reward = -1000
     if last_action == 3:  # South
         if obs[13] == 1:
-            shaped_reward = -10
+            shaped_reward = -1000
     elif last_action == 4:  # PICKUP
         if now_doing == 5 and now_r == goal_r and now_c == goal_c:
             shaped_reward += 0
         else:
-            shaped_reward = -10
+            shaped_reward = -1000
     elif last_action == 5:  # DROPOFF
         if now_doing == 7 and now_r == goal_r and now_c == goal_c:
             shaped_reward += 0
         else:
-            shaped_reward = -10
+            shaped_reward = -1000
 
     # Update Q-table if reward and next_obs are provided
     reward = shaped_reward
