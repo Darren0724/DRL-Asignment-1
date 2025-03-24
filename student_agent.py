@@ -61,12 +61,10 @@ def get_action(obs, reward=None, next_obs=None):
         epsilon = 0.1
     elif step <= 150:
         epsilon = 0.15
-    elif step <= 200:
-        epsilon = 0.3  # More aggressive exploration
     else:
-        epsilon = min(0.3 + (step - 200) * 0.002, 0.5)  # Cap at 0.5 for extreme cases
+        epsilon = min(0.15 + (step - 150) * 0.001, 0.2)  # Gradual increase, cap at 0.2
     
-    # Online learning
+    # Online learning if reward is provided
     if rec_reward is not None and rec_state is not None:
         next_state = get_state_key(obs)
         if next_state not in q_table:
@@ -130,17 +128,13 @@ def get_action(obs, reward=None, next_obs=None):
     state = get_state_key(obs)
     if state not in q_table:
         q_table[state] = np.zeros(6)
-    q_values = q_table[state].copy()  # Copy to avoid modifying original
+    q_values = q_table[state]
     
-    # Increase exploration if stuck
+    # Increase exploration if stuck (based on visit count)
     current_pos = (now_r, now_c)
     visit_count[current_pos] = visit_count.get(current_pos, 0) + 1
-    if visit_count[current_pos] > 5:
-        local_epsilon = min(epsilon + 0.15, 0.5)  # Boost exploration more aggressively
-        # Penalize revisited actions
-        for action in range(4):
-            if (now_r, now_c, action) in move_history:
-                q_values[action] -= 2  # Stronger penalty for revisited moves
+    if visit_count[current_pos] > 5:  # If visited too many times, boost exploration
+        local_epsilon = min(epsilon + 0.1, 0.3)
     else:
         local_epsilon = epsilon
     
@@ -154,70 +148,65 @@ def get_action(obs, reward=None, next_obs=None):
     if last_action in [0, 1, 2, 3] and not (last_action == 0 and obs[11] or last_action == 1 and obs[10] or last_action == 2 and obs[12] or last_action == 3 and obs[13]):
         move_history[(now_r, now_c, last_action)] = True
     
-    # Reward shaping aligned with training
+    # Consistent reward shaping (aligned with your previous train design)
     shaped_reward = 0
     dir1 = sign(goal_r - now_r)
     dir2 = sign(goal_c - now_c)
     
     if last_action == 0:  # South
         if now_r == goal_r and now_c == goal_c:
-            shaped_reward += 7  # Increased from 5
+            shaped_reward += 5
         if obs[11] == 1:
-            shaped_reward -= 10
+            shaped_reward -= 100
         if dir1 == 1:
             shaped_reward += 1
         elif dir1 == -1:
             shaped_reward -= 1
         if not obs[11] and (now_r, now_c, 0) in move_history:
-            shaped_reward -= 1  # Increased from 0.5
+            shaped_reward -= 0.5
     elif last_action == 1:  # North
         if now_r == goal_r and now_c == goal_c:
-            shaped_reward += 7
+            shaped_reward += 5
         if obs[10] == 1:
-            shaped_reward -= 10
+            shaped_reward -= 100
         if dir1 == -1:
             shaped_reward += 1
         elif dir1 == 1:
             shaped_reward -= 1
         if not obs[10] and (now_r, now_c, 1) in move_history:
-            shaped_reward -= 1
+            shaped_reward -= 0.5
     elif last_action == 2:  # East
         if now_r == goal_r and now_c == goal_c:
-            shaped_reward += 7
+            shaped_reward += 5
         if obs[12] == 1:
-            shaped_reward -= 10
+            shaped_reward -= 100
         if dir2 == 1:
             shaped_reward += 1
         elif dir2 == -1:
             shaped_reward -= 1
         if not obs[12] and (now_r, now_c, 2) in move_history:
-            shaped_reward -= 1
+            shaped_reward -= 0.5
     elif last_action == 3:  # West
         if now_r == goal_r and now_c == goal_c:
-            shaped_reward += 7
+            shaped_reward += 5
         if obs[13] == 1:
-            shaped_reward -= 10
+            shaped_reward -= 100
         if dir2 == -1:
             shaped_reward += 1
         elif dir2 == 1:
             shaped_reward -= 1
         if not obs[13] and (now_r, now_c, 3) in move_history:
-            shaped_reward -= 1
+            shaped_reward -= 0.5
     elif last_action == 4:  # PICKUP
         if now_doing == 5 and now_r == goal_r and now_c == goal_c:
-            shaped_reward += 100
+            shaped_reward += 10
         else:
-            shaped_reward -= 10
+            shaped_reward -= 100
     elif last_action == 5:  # DROPOFF
         if now_doing == 7 and now_r == goal_r and now_c == goal_c:
-            shaped_reward += 100
+            shaped_reward += 10
         else:
-            shaped_reward -= 10
-    
-    # Step limit: reset exploration if too long
-    if step > 200 and visit_count[current_pos] > 10:
-        move_history.clear()  # Reset history to force new path
-        epsilon = 0.5  # Max exploration
+            shaped_reward -= 100
     
     # Update for next iteration
     rec_reward = shaped_reward
