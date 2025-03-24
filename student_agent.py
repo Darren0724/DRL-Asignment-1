@@ -1,15 +1,15 @@
 import numpy as np
 import pickle
 import random
-from time import sleep
 
 # Load the trained Q-table
 with open("q_table.pkl", "rb") as f:
     q_table = pickle.load(f)
 
-# Global variables (consistent with train_agent.py)
-move_history = {}
-now_doing = 0  # 0: moving1, 1: moving2, 2: moving3, 3: moving4, 4: move pickup, 5: pickup, 6: move dropoff, 7: dropoff
+# Global variables
+move_history = {}  # (row, col, action) -> True if visited
+visit_count = {}   # (row, col) -> number of visits
+now_doing = 0
 goal_r = -1
 goal_c = -1
 now_r = 0
@@ -19,27 +19,16 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-epsilon = 0.05  # Exploration rate for epsilon-greedy
-alpha = 0.1    # Learning rate for Q-table update
-gamma = 0.99   # Discount factor for Q-table update
+epsilon = 0.05  # Initial exploration rate
+alpha = 0.1
+gamma = 0.99
 rec_reward = 0
 rec_state = None
 step = 0
-def sign(x):   
+
+def sign(x):
     if x > 0:
         return 1
-    elif x < 0:
-        return -1
-    else:
-        return 0
-
-def sign2(x):   
-    if x > 3:
-        return 2
-    elif x > 0:
-        return 1
-    elif x < -3:
-        return -2
     elif x < 0:
         return -1
     else:
@@ -60,15 +49,22 @@ def get_state_key(obs):
     return (north_state, south_state, east_state, west_state, sign(goal_r - now_r), sign(goal_c - now_c))
 
 def get_action(obs, reward=None, next_obs=None):
+    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table
+    global move_history, visit_count, rec_reward, rec_state, step, epsilon
     
-    global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history, rec_reward, rec_state, step, epsilon
     step += 1
-    if step > 50:
-        epsilon = 0.11
-    if step > 100:
-        epsilon = 0.2
-    if step > 200:
-        epsilon = 0.27
+    
+    # Dynamic epsilon adjustment
+    if step <= 50:
+        epsilon = 0.05
+    elif step <= 100:
+        epsilon = 0.1
+    elif step <= 150:
+        epsilon = 0.15
+    else:
+        epsilon = min(0.15 + (step - 150) * 0.001, 0.2)  # Gradual increase, cap at 0.2
+    
+    # Online learning if reward is provided
     if rec_reward is not None and rec_state is not None:
         next_state = get_state_key(obs)
         if next_state not in q_table:
@@ -76,20 +72,22 @@ def get_action(obs, reward=None, next_obs=None):
         q_table[rec_state][last_action] += alpha * (
             rec_reward + gamma * np.max(q_table[next_state]) - q_table[rec_state][last_action]
         )
-    # Update station positions and current position
+    
+    # Update positions
     for i in range(4):
         row[i] = obs[2*i+2]
         col[i] = obs[2*i+3]
     now_r = obs[0]
     now_c = obs[1]
     
-    # Initialize goal if not set (start of episode)
+    # Initialize goal
     if goal_r == -1:
         goal_r = row[0]
         goal_c = col[0]
-        move_history.clear()  # Reset history at the start of an episode
+        move_history.clear()
+        visit_count.clear()
     
-    # State machine transitions (consistent with train_agent.py)
+    # State machine
     if now_doing < 4:
         if now_r == goal_r and now_c == goal_c:
             if obs[14] == 1:
@@ -119,56 +117,99 @@ def get_action(obs, reward=None, next_obs=None):
         if now_r == goal_r and now_c == goal_c and last_action == 5:
             now_doing = 8
     
-    # Define valid actions based on now_doing
-    valid_actions = [i for i in range(4)]  # Movement actions by default
+    # Define valid actions
+    valid_actions = [i for i in range(4)]
     if now_doing == 5 and now_r == goal_r and now_c == goal_c:
-        valid_actions = [4]  # Only PICKUP when at pickup location
+        valid_actions = [4]
     elif now_doing == 7 and now_r == goal_r and now_c == goal_c:
-        valid_actions = [5]  # Only DROPOFF when at dropoff location
+        valid_actions = [5]
     
     # Get current state
     state = get_state_key(obs)
-    
-    # ε-greedy action selection
     if state not in q_table:
-        q_table[state] = np.zeros(6)  # Initialize if not in table
+        q_table[state] = np.zeros(6)
     q_values = q_table[state]
     
-    if random.random() < epsilon:
-        last_action = random.choice(valid_actions)  # Explore
+    # Increase exploration if stuck (based on visit count)
+    current_pos = (now_r, now_c)
+    visit_count[current_pos] = visit_count.get(current_pos, 0) + 1
+    if visit_count[current_pos] > 5:  # If visited too many times, boost exploration
+        local_epsilon = min(epsilon + 0.1, 0.3)
     else:
-        last_action = max(valid_actions, key=lambda a: q_values[a])  # Exploit
+        local_epsilon = epsilon
     
-    # Update move history for movement actions
+    # ε-greedy action selection
+    if random.random() < local_epsilon:
+        last_action = random.choice(valid_actions)
+    else:
+        last_action = max(valid_actions, key=lambda a: q_values[a])
+    
+    # Update move history
     if last_action in [0, 1, 2, 3] and not (last_action == 0 and obs[11] or last_action == 1 and obs[10] or last_action == 2 and obs[12] or last_action == 3 and obs[13]):
         move_history[(now_r, now_c, last_action)] = True
+    
+    # Consistent reward shaping (aligned with your previous train design)
     shaped_reward = 0
+    dir1 = sign(goal_r - now_r)
+    dir2 = sign(goal_c - now_c)
+    
     if last_action == 0:  # South
+        if now_r == goal_r and now_c == goal_c:
+            shaped_reward += 5
         if obs[11] == 1:
-            shaped_reward = -100
-    if last_action == 1:  # South
+            shaped_reward -= 100
+        if dir1 == 1:
+            shaped_reward += 1
+        elif dir1 == -1:
+            shaped_reward -= 1
+        if not obs[11] and (now_r, now_c, 0) in move_history:
+            shaped_reward -= 0.5
+    elif last_action == 1:  # North
+        if now_r == goal_r and now_c == goal_c:
+            shaped_reward += 5
         if obs[10] == 1:
-            shaped_reward = -100
-    if last_action == 2:  # South
+            shaped_reward -= 100
+        if dir1 == -1:
+            shaped_reward += 1
+        elif dir1 == 1:
+            shaped_reward -= 1
+        if not obs[10] and (now_r, now_c, 1) in move_history:
+            shaped_reward -= 0.5
+    elif last_action == 2:  # East
+        if now_r == goal_r and now_c == goal_c:
+            shaped_reward += 5
         if obs[12] == 1:
-            shaped_reward = -100
-    if last_action == 3:  # South
+            shaped_reward -= 100
+        if dir2 == 1:
+            shaped_reward += 1
+        elif dir2 == -1:
+            shaped_reward -= 1
+        if not obs[12] and (now_r, now_c, 2) in move_history:
+            shaped_reward -= 0.5
+    elif last_action == 3:  # West
+        if now_r == goal_r and now_c == goal_c:
+            shaped_reward += 5
         if obs[13] == 1:
-            shaped_reward = -100
+            shaped_reward -= 100
+        if dir2 == -1:
+            shaped_reward += 1
+        elif dir2 == 1:
+            shaped_reward -= 1
+        if not obs[13] and (now_r, now_c, 3) in move_history:
+            shaped_reward -= 0.5
     elif last_action == 4:  # PICKUP
         if now_doing == 5 and now_r == goal_r and now_c == goal_c:
-            shaped_reward = 100
+            shaped_reward += 10
         else:
-            shaped_reward = -100
+            shaped_reward -= 100
     elif last_action == 5:  # DROPOFF
         if now_doing == 7 and now_r == goal_r and now_c == goal_c:
-            shaped_reward = 100
+            shaped_reward += 10
         else:
-            shaped_reward = -100 
-
-    # Update Q-table if reward and next_obs are provided
-    reward = shaped_reward
-    rec_reward = reward 
+            shaped_reward -= 100
+    
+    # Update for next iteration
+    rec_reward = shaped_reward
     rec_state = state
     
     return last_action
