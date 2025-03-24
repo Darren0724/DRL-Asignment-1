@@ -19,13 +19,12 @@ col = [0]*4
 st = -1
 ed = -1
 last_action = 0
-epsilon = 0.05  # Exploration rate for epsilon-greedy
+epsilon = 0.01  # Exploration rate for epsilon-greedy
 alpha = 0.1    # Learning rate for Q-table update
 gamma = 0.99   # Discount factor for Q-table update
 rec_reward = 0
 rec_state = None
 step = 0
-
 def sign(x):   
     if x > 0:
         return 1
@@ -58,19 +57,23 @@ def get_state_key(obs):
     east_state = 1 if obstacle_east else (2 if (now_r, now_c, 2) in move_history else 0)
     west_state = 1 if obstacle_west else (2 if (now_r, now_c, 3) in move_history else 0)
     
-    return (north_state, south_state, east_state, west_state, sign2(goal_r - now_r), sign2(goal_c - now_c))
+    return (north_state, south_state, east_state, west_state, sign(goal_r - now_r), sign(goal_c - now_c))
 
 def get_action(obs, reward=None, next_obs=None):
+    
     global now_doing, goal_r, goal_c, now_r, now_c, row, col, st, ed, last_action, q_table, move_history, rec_reward, rec_state, step, epsilon
     step += 1
     if step > 50:
-        epsilon = 0.1
+        epsilon = 0.05
     if step > 100:
-        epsilon = 0.2
+        epsilon = 0.1
+    if step > 150:
+        epsilon = 0.15
     if step > 200:
-        epsilon = 0.35
+        epsilon = 0.2
     if rec_reward is not None and rec_state is not None:
         next_state = get_state_key(obs)
+        #print('yes')
         if next_state not in q_table:
             q_table[next_state] = np.zeros(6)
         q_table[rec_state][last_action] += alpha * (
@@ -142,34 +145,27 @@ def get_action(obs, reward=None, next_obs=None):
     # Update move history for movement actions
     if last_action in [0, 1, 2, 3] and not (last_action == 0 and obs[11] or last_action == 1 and obs[10] or last_action == 2 and obs[12] or last_action == 3 and obs[13]):
         move_history[(now_r, now_c, last_action)] = True
-    
-    # Calculate shaped reward
-    shaped_reward = 0
-    
-    # Check if this action was used before in this position
-    if (now_r, now_c, last_action) in move_history:
-        shaped_reward -= 1
-    
+    shaped_reward = -0.1
     if last_action == 0:  # South
         if obs[11] == 1:
             shaped_reward = -100
-    elif last_action == 1:  # North
+    if last_action == 1:  # South
         if obs[10] == 1:
             shaped_reward = -100
-    elif last_action == 2:  # East
+    if last_action == 2:  # South
         if obs[12] == 1:
             shaped_reward = -100
-    elif last_action == 3:  # West
+    if last_action == 3:  # South
         if obs[13] == 1:
             shaped_reward = -100
     elif last_action == 4:  # PICKUP
         if now_doing == 5 and now_r == goal_r and now_c == goal_c:
-            shaped_reward = 100
+            shaped_reward += 0
         else:
             shaped_reward = -100
     elif last_action == 5:  # DROPOFF
         if now_doing == 7 and now_r == goal_r and now_c == goal_c:
-            shaped_reward = 100
+            shaped_reward += 0
         else:
             shaped_reward = -100
 
