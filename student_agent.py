@@ -4,7 +4,7 @@ import random
 
 # Load the trained Q-table
 with open("q_table.pkl", "rb") as f:
-    q_table = pickle.load(f)
+    q_table = pickle.load(f) 
 
 # Global variables
 move_history = {}  # (row, col, action) -> True if visited
